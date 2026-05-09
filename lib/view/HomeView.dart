@@ -27,6 +27,7 @@ class _HomeViewState extends State<HomeView> {
   String _userName = '';
   bool _isLoading = true;
   String? _error;
+  bool _isRefreshingFavorites = false;
 
   @override
   void initState() {
@@ -76,6 +77,18 @@ class _HomeViewState extends State<HomeView> {
           product.styleTags.any((tag) => tag.toLowerCase() == _selectedTag.toLowerCase());
       return matchesSearch && matchesTag;
     }).toList();
+  }
+
+  Future<void> _refreshFavorites() async {
+    if (_isRefreshingFavorites) return;
+    _isRefreshingFavorites = true;
+    try {
+      final user = await _userRepository.getCurrentUser();
+      if (!mounted) return;
+      setState(() => _favoriteIds = user.favorites.toSet());
+    } finally {
+      _isRefreshingFavorites = false;
+    }
   }
 
   @override
@@ -195,14 +208,16 @@ class _HomeViewState extends State<HomeView> {
                     isFavorite: isFavorite,
                     onFavoriteTap: () async {
                       await _userRepository.toggleFavorite(product.id);
-                      final user = await _userRepository.getCurrentUser();
-                      if (!mounted) return;
-                      setState(() => _favoriteIds = user.favorites.toSet());
+                      await _refreshFavorites();
                     },
-                    onTap: () => Navigator.of(context).pushNamed(
-                      AppRoutesView.productDetail,
-                      arguments: product.id,
-                    ),
+                    onTap: () async {
+                      await Navigator.of(context).pushNamed(
+                        AppRoutesView.productDetail,
+                        arguments: product.id,
+                      );
+                      await _refreshFavorites();
+                      await _load();
+                    },
                   );
                 },
                 childCount: products.length,

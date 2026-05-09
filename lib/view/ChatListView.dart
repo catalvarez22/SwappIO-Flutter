@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 
-import '../viewModel/AppServicesViewModel.dart';
-import 'shared/AppColorsView.dart';
 import '../model/AppUserModel.dart';
 import '../model/ChatChannelModel.dart';
+import '../viewModel/AppServicesViewModel.dart';
+import 'shared/AppColorsView.dart';
 import 'shared/AppRoutesView.dart';
 import 'shared/AsyncStateView.dart';
-import 'shared/SwapioBottomNavView.dart';
 import 'shared/GradientScaffoldView.dart';
+import 'shared/SwapioBottomNavView.dart';
 
 class ChatListView extends StatelessWidget {
   const ChatListView({super.key});
@@ -34,85 +34,119 @@ class ChatListView extends StatelessWidget {
         final currentUser = snapshot.data![0] as AppUserModel;
         final chats = snapshot.data![1] as List<ChatChannelModel>;
         final now = DateTime.now();
-        final recentChats = chats.where((chat) => now.difference(chat.lastMessageTimestamp).inDays < 1).toList();
-        final olderChats = chats.where((chat) => now.difference(chat.lastMessageTimestamp).inDays >= 1).toList();
+        final recentChats = chats
+            .where((chat) => now.difference(chat.lastMessageTimestamp).inDays < 1)
+            .toList();
+        final olderChats = chats
+            .where((chat) => now.difference(chat.lastMessageTimestamp).inDays >= 1)
+            .toList();
+        final items = <_ChatListItem>[
+          if (recentChats.isNotEmpty) const _ChatListItem.header('Recientes'),
+          ...recentChats.map(_ChatListItem.chat),
+          if (olderChats.isNotEmpty) const _ChatListItem.header('Anteriores'),
+          ...olderChats.map(_ChatListItem.chat),
+        ];
+
         return GradientScaffoldView(
-      bottomNavigationBar: const SwapioBottomNavView(currentRoute: AppRoutesView.chatList),
-      child: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 24, 16, 16),
-            child: Column(
-              children: [
-                Row(
+          bottomNavigationBar: const SwapioBottomNavView(
+            currentRoute: AppRoutesView.chatList,
+          ),
+          child: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 24, 16, 16),
+                child: Column(
                   children: [
-                    IconButton(onPressed: () => Navigator.of(context).maybePop(), icon: const Icon(Icons.arrow_back_rounded)),
-                    const Expanded(
-                      child: Text('Mensajes', textAlign: TextAlign.center, style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700)),
+                    Row(
+                      children: [
+                        IconButton(
+                          onPressed: () => Navigator.of(context).maybePop(),
+                          icon: const Icon(Icons.arrow_back_rounded),
+                        ),
+                        const Expanded(
+                          child: Text(
+                            'Mensajes',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
+                          ),
+                        ),
+                        IconButton(
+                          onPressed: () {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('No tienes notificaciones nuevas.'),
+                              ),
+                            );
+                          },
+                          icon: const Icon(Icons.notifications_rounded),
+                        ),
+                      ],
                     ),
-                    IconButton(
-                      onPressed: () {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('No tienes notificaciones nuevas.')),
-                        );
-                      },
-                      icon: const Icon(Icons.notifications_rounded),
+                    const SizedBox(height: 12),
+                    const TextField(
+                      decoration: InputDecoration(
+                        hintText: 'Buscar conversaciones...',
+                        prefixIcon: Icon(Icons.search_rounded),
+                      ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 12),
-                const TextField(
-                  decoration: InputDecoration(
-                    hintText: 'Buscar conversaciones...',
-                    prefixIcon: Icon(Icons.search_rounded),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Expanded(
-            child: chats.isEmpty
-                ? const Center(child: Text('No tienes mensajes aún.'))
-                : ListView(
-                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 110),
-                    children: [
-                      if (recentChats.isNotEmpty) ...[
-                        const Padding(
-                          padding: EdgeInsets.only(left: 8, bottom: 4),
-                          child: Text('Recientes', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColorsView.primary)),
-                        ),
-                        ...recentChats.map((chat) => Padding(
-                              padding: const EdgeInsets.only(bottom: 12),
-                              child: _ChatCard(
-                                chat: chat,
-                                currentUserId: currentUser.id,
-                                onTap: () => Navigator.of(context).pushNamed(AppRoutesView.chatDetail, arguments: chat.id),
+              ),
+              Expanded(
+                child: chats.isEmpty
+                    ? const Center(child: Text('No tienes mensajes aun.'))
+                    : ListView.builder(
+                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 110),
+                        itemCount: items.length,
+                        itemBuilder: (context, index) {
+                          final item = items[index];
+                          if (item.header != null) {
+                            return Padding(
+                              padding: EdgeInsets.only(
+                                left: 8,
+                                top: index == 0 ? 0 : 12,
+                                bottom: 4,
                               ),
-                            )),
-                      ],
-                      if (olderChats.isNotEmpty) ...[
-                        const Padding(
-                          padding: EdgeInsets.only(left: 8, top: 12, bottom: 4),
-                          child: Text('Anteriores', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColorsView.primary)),
-                        ),
-                        ...olderChats.map((chat) => Padding(
-                              padding: const EdgeInsets.only(bottom: 12),
-                              child: _ChatCard(
-                                chat: chat,
-                                currentUserId: currentUser.id,
-                                onTap: () => Navigator.of(context).pushNamed(AppRoutesView.chatDetail, arguments: chat.id),
+                              child: Text(
+                                item.header!,
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppColorsView.primary,
+                                ),
                               ),
-                            )),
-                      ],
-                    ],
-                  ),
+                            );
+                          }
+
+                          final chat = item.chat!;
+                          return Padding(
+                            padding: const EdgeInsets.only(bottom: 12),
+                            child: _ChatCard(
+                              chat: chat,
+                              currentUserId: currentUser.id,
+                              onTap: () => Navigator.of(context).pushNamed(
+                                AppRoutesView.chatDetail,
+                                arguments: chat.id,
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+              ),
+            ],
           ),
-        ],
-      ),
         );
       },
     );
   }
+}
+
+class _ChatListItem {
+  const _ChatListItem.header(this.header) : chat = null;
+  const _ChatListItem.chat(this.chat) : header = null;
+
+  final String? header;
+  final ChatChannelModel? chat;
 }
 
 class _ChatCard extends StatelessWidget {
@@ -148,7 +182,11 @@ class _ChatCard extends StatelessWidget {
           children: [
             Stack(
               children: [
-                CircleAvatar(radius: 28, backgroundColor: Colors.white, child: Text(otherName.substring(0, 1))),
+                CircleAvatar(
+                  radius: 28,
+                  backgroundColor: Colors.white,
+                  child: Text(otherName.substring(0, 1)),
+                ),
                 Positioned(
                   right: 0,
                   bottom: 0,
@@ -156,7 +194,9 @@ class _ChatCard extends StatelessWidget {
                     width: 14,
                     height: 14,
                     decoration: BoxDecoration(
-                      color: chat.unreadCount > 0 ? const Color(0xFF4CAF50) : Colors.grey,
+                      color: chat.unreadCount > 0
+                          ? const Color(0xFF4CAF50)
+                          : Colors.grey,
                       shape: BoxShape.circle,
                       border: Border.all(color: Colors.white, width: 2),
                     ),
@@ -171,13 +211,22 @@ class _ChatCard extends StatelessWidget {
                 children: [
                   Row(
                     children: [
-                      Expanded(child: Text(otherName, style: const TextStyle(fontWeight: FontWeight.w700))),
+                      Expanded(
+                        child: Text(
+                          otherName,
+                          style: const TextStyle(fontWeight: FontWeight.w700),
+                        ),
+                      ),
                       Text(
                         _formatTime(chat.lastMessageTimestamp),
                         style: TextStyle(
                           fontSize: 12,
-                          fontWeight: chat.unreadCount > 0 ? FontWeight.w700 : FontWeight.w400,
-                          color: chat.unreadCount > 0 ? AppColorsView.primary : AppColorsView.textMuted,
+                          fontWeight: chat.unreadCount > 0
+                              ? FontWeight.w700
+                              : FontWeight.w400,
+                          color: chat.unreadCount > 0
+                              ? AppColorsView.primary
+                              : AppColorsView.textMuted,
                         ),
                       ),
                     ],
@@ -207,7 +256,15 @@ class _ChatCard extends StatelessWidget {
       return 'Ayer';
     }
     if (now.difference(timestamp).inDays < 7) {
-      const weekdays = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
+      const weekdays = [
+        'Lunes',
+        'Martes',
+        'Miercoles',
+        'Jueves',
+        'Viernes',
+        'Sabado',
+        'Domingo',
+      ];
       return weekdays[timestamp.weekday - 1];
     }
     return '${timestamp.day.toString().padLeft(2, '0')}/${timestamp.month.toString().padLeft(2, '0')}';
@@ -220,7 +277,3 @@ class _ChatCard extends StatelessWidget {
     return '$hour:$minute $suffix';
   }
 }
-
-
-
-

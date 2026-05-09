@@ -268,7 +268,10 @@ class MockSwapioRepositoryViewModel {
     return chats;
   }
 
-  ChatChannelModel getChat(String chatId) => _chats[chatId]!;
+  ChatChannelModel getChat(String chatId) {
+    final chat = _chats[chatId]!;
+    return chat.copyWith(messages: _normalizeMessages(chat.messages));
+  }
 
   String startChatForProduct(String productId) {
     final user = currentUser!;
@@ -318,19 +321,20 @@ class MockSwapioRepositoryViewModel {
   void sendMessage(String chatId, String text) {
     final user = currentUser!;
     final chat = getChat(chatId);
+    final cleanedText = text.trim();
+    if (cleanedText.isEmpty) return;
     final messages = List<ChatMessageModel>.from(chat.messages)
-      ..insert(
-        0,
+      ..add(
         ChatMessageModel(
           id: 'message_${chatId}_${messagesSeed.nextInt(99999)}',
           senderId: user.id,
-          text: text.trim(),
+          text: cleanedText,
           timestamp: DateTime.now(),
         ),
       );
     _chats[chatId] = chat.copyWith(
-      messages: messages,
-      lastMessage: text.trim(),
+      messages: _normalizeMessages(messages),
+      lastMessage: cleanedText,
       lastMessageTimestamp: DateTime.now(),
     );
   }
@@ -582,6 +586,18 @@ class MockSwapioRepositoryViewModel {
         ),
       ],
     );
+  }
+
+  List<ChatMessageModel> _normalizeMessages(List<ChatMessageModel> messages) {
+    final unique = <String, ChatMessageModel>{};
+    for (final message in messages) {
+      final key =
+          '${message.id}_${message.senderId}_${message.timestamp.toIso8601String()}_${message.text}';
+      unique[key] = message;
+    }
+    final normalized = unique.values.toList();
+    normalized.sort((a, b) => a.timestamp.compareTo(b.timestamp));
+    return normalized;
   }
 
   static List<String> _fallbackPalette(int index) {

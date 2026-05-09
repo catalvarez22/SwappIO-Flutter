@@ -23,6 +23,9 @@ class _ProductDetailViewState extends State<ProductDetailView> {
   final _userRepository = AppServicesViewModel.instance.userRepository;
   final _chatRepository = AppServicesViewModel.instance.chatRepository;
   final _paymentGateway = AppServicesViewModel.instance.paymentGatewayRepository;
+  bool? _favoriteOverride;
+  bool _isFavoriteUpdating = false;
+  bool _isPurchasing = false;
 
   void _showMessage(String message, {bool isError = false}) {
     ScaffoldMessenger.of(context).showSnackBar(
@@ -43,6 +46,9 @@ class _ProductDetailViewState extends State<ProductDetailView> {
     if (checkoutRequest == null) return;
 
     try {
+      if (mounted) {
+        setState(() => _isPurchasing = true);
+      }
       final paymentResult = await _paymentGateway.authorizePayment(
         amount: product.price,
         productId: product.id,
@@ -68,6 +74,33 @@ class _ProductDetailViewState extends State<ProductDetailView> {
         error.toString().replaceFirst('Exception: ', ''),
         isError: true,
       );
+    } finally {
+      if (mounted) {
+        setState(() => _isPurchasing = false);
+      }
+    }
+  }
+
+  Future<void> _toggleFavorite(ProductModel product, AppUserModel currentUser) async {
+    if (_isFavoriteUpdating) return;
+    final currentValue = _favoriteOverride ?? currentUser.favorites.contains(product.id);
+    setState(() {
+      _favoriteOverride = !currentValue;
+      _isFavoriteUpdating = true;
+    });
+    try {
+      await _userRepository.toggleFavorite(product.id);
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => _favoriteOverride = currentValue);
+      _showMessage(
+        error.toString().replaceFirst('Exception: ', ''),
+        isError: true,
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isFavoriteUpdating = false);
+      }
     }
   }
 
@@ -125,6 +158,7 @@ class _ProductDetailViewState extends State<ProductDetailView> {
         final currentUser = snapshot.data![2] as AppUserModel;
         final suggestions = snapshot.data![3] as List<ProductModel>;
         final isOwner = currentUser.id == owner.id;
+        final isFavorite = _favoriteOverride ?? currentUser.favorites.contains(product.id);
         return Scaffold(
       backgroundColor: const Color(0xFFF5F8F8),
       body: Stack(
@@ -185,6 +219,20 @@ class _ProductDetailViewState extends State<ProductDetailView> {
                                     '\$${product.price.toStringAsFixed(0)}',
                                     style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w800, color: AppColorsView.primary),
                                   ),
+                                  if (!isOwner)
+                                    IconButton(
+                                      onPressed: _isFavoriteUpdating
+                                          ? null
+                                          : () => _toggleFavorite(product, currentUser),
+                                      icon: Icon(
+                                        isFavorite
+                                            ? Icons.favorite_rounded
+                                            : Icons.favorite_border_rounded,
+                                        color: isFavorite
+                                            ? Colors.pink
+                                            : AppColorsView.textPrimary,
+                                      ),
+                                    ),
                                 ],
                               ),
                               const Divider(height: 28),
@@ -403,6 +451,15 @@ class _ProductDetailViewState extends State<ProductDetailView> {
               ),
             ),
           ),
+          if (_isPurchasing)
+            Positioned.fill(
+              child: ColoredBox(
+                color: Colors.black.withOpacity(0.22),
+                child: const Center(
+                  child: CircularProgressIndicator(),
+                ),
+              ),
+            ),
         ],
       ),
         );

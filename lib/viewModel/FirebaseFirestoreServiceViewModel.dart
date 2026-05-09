@@ -436,7 +436,9 @@ class FirebaseFirestoreServiceViewModel implements FirestoreServiceViewModel {
 
     return _chatFromDoc(
       chatDoc,
-      messages: messagesSnapshot.docs.map(_messageFromDoc).toList(),
+      messages: _normalizeMessages(
+        messagesSnapshot.docs.map(_messageFromDoc).toList(),
+      ),
     );
   }
 
@@ -690,6 +692,18 @@ class FirebaseFirestoreServiceViewModel implements FirestoreServiceViewModel {
       timestamp: _parseDate(data['timestamp']),
       isRead: data['isRead'] == true,
     );
+  }
+
+  List<ChatMessageModel> _normalizeMessages(List<ChatMessageModel> messages) {
+    final unique = <String, ChatMessageModel>{};
+    for (final message in messages) {
+      final key =
+          '${message.id}_${message.senderId}_${message.timestamp.toIso8601String()}_${message.text}';
+      unique[key] = message;
+    }
+    final normalized = unique.values.toList();
+    normalized.sort((a, b) => a.timestamp.compareTo(b.timestamp));
+    return normalized;
   }
 
   List<String> _sanitizeImages(List<String> images) {

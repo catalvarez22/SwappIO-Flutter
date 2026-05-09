@@ -32,6 +32,13 @@ class ActivityView extends StatefulWidget {
 class _ActivityViewState extends State<ActivityView> {
   final _userRepository = AppServicesViewModel.instance.userRepository;
   final _productRepository = AppServicesViewModel.instance.productRepository;
+  late Future<List<Object>> _activityFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _activityFuture = _loadData();
+  }
 
   Future<List<ProductModel>> _loadProducts() async {
     final user = await _userRepository.getCurrentUser();
@@ -45,18 +52,22 @@ class _ActivityViewState extends State<ActivityView> {
     }
   }
 
+  Future<List<Object>> _loadData() {
+    return Future.wait<Object>([
+      _loadProducts(),
+      _userRepository.getCurrentUser(),
+    ]);
+  }
+
   @override
   Widget build(BuildContext context) {
     return FutureBuilder<List<Object>>(
-      future: Future.wait<Object>([
-        _loadProducts(),
-        _userRepository.getCurrentUser(),
-      ]),
+      future: _activityFuture,
       builder: (context, snapshot) {
         if (snapshot.hasError) {
           return AsyncStateView(
             message: snapshot.error.toString().replaceFirst('Exception: ', ''),
-            onRetry: () => setState(() {}),
+            onRetry: () => setState(() => _activityFuture = _loadData()),
           );
         }
         if (!snapshot.hasData) {
@@ -102,12 +113,19 @@ class _ActivityViewState extends State<ActivityView> {
                           isFavorite: favorites.contains(product.id),
                           onFavoriteTap: () async {
                             await _userRepository.toggleFavorite(product.id);
-                            if (mounted) setState(() {});
+                            if (mounted) {
+                              setState(() => _activityFuture = _loadData());
+                            }
                           },
-                          onTap: () => Navigator.of(context).pushNamed(
-                            AppRoutesView.productDetail,
-                            arguments: product.id,
-                          ),
+                          onTap: () async {
+                            await Navigator.of(context).pushNamed(
+                              AppRoutesView.productDetail,
+                              arguments: product.id,
+                            );
+                            if (mounted) {
+                              setState(() => _activityFuture = _loadData());
+                            }
+                          },
                         );
                       },
                     ),
